@@ -152,6 +152,12 @@ export default function HomePage() {
     return Object.values(summary.pipeline).reduce((acc: number, v: number) => acc + v, 0);
   }, [summary]);
 
+  const fillRate = useMemo(() => {
+    if (!summary?.headcount_trend || summary.headcount_trend.length === 0) return 0;
+    const latest = summary.headcount_trend[summary.headcount_trend.length - 1];
+    return latest.required > 0 ? Math.round((latest.working / latest.required) * 100) : 0;
+  }, [summary]);
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
@@ -163,12 +169,6 @@ export default function HomePage() {
   if (error) {
     return <Alert severity="error">{error}</Alert>;
   }
-
-  const fillRate = useMemo(() => {
-    if (!summary?.headcount_trend || summary.headcount_trend.length === 0) return 0;
-    const latest = summary.headcount_trend[summary.headcount_trend.length - 1];
-    return latest.required > 0 ? Math.round((latest.working / latest.required) * 100) : 0;
-  }, [summary]);
 
   return (
     <Box>
