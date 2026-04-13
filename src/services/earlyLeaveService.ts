@@ -21,7 +21,8 @@ export async function getEarlyLeaves(
     .select(
       `
       *,
-      associate:associates!eid (
+      associate:associates!associate_eid (
+        eid,
         first_name,
         last_name,
         branch,
@@ -40,16 +41,16 @@ export async function getEarlyLeaves(
     query = query.lte('date', filters.end_date);
   }
 
-  if (filters?.eid) {
-    query = query.eq('eid', filters.eid);
+  if (filters?.associate_eid) {
+    query = query.eq('associate_eid', filters.associate_eid);
+  }
+
+  if (filters?.search) {
+    query = query.or(`associate_eid.ilike.%${filters.search}%`);
   }
 
   if (filters?.shift) {
     query = query.eq('shift', filters.shift);
-  }
-
-  if (filters?.branch) {
-    query = query.eq('branch', filters.branch);
   }
 
   query = query.order('date', { ascending: false }).range(from, to);
@@ -119,18 +120,16 @@ export async function getCorrectiveActions(
     .select(
       `
       *,
-      associate:associates!eid (
+      associate:associates!associate_eid (
+        eid,
         first_name,
-        last_name,
-        branch,
-        shift,
-        status
+        last_name
       )
     `
     );
 
   if (eid) {
-    query = query.eq('eid', eid);
+    query = query.eq('associate_eid', eid);
   }
 
   query = query.order('date', { ascending: false });
@@ -153,11 +152,11 @@ export async function getEarlyLeaveStats(
     .select(
       `
       id,
-      eid,
+      associate_eid,
       shift,
-      branch,
       hours_worked,
-      associate:associates!eid (
+      corrective_action,
+      associate:associates!associate_eid (
         first_name,
         last_name
       )
@@ -178,60 +177,34 @@ export async function getEarlyLeaveStats(
     throw new Error(`Failed to fetch early leave stats: ${error.message}`);
   }
 
-  type EarlyLeaveRow = {
+  type Row = {
     id: string;
-    eid: string;
+    associate_eid: string;
     shift: string;
-    branch: string | null;
     hours_worked: number | null;
+    corrective_action: string;
     associate: { first_name: string; last_name: string } | null;
   };
 
-  const rows = (data as EarlyLeaveRow[]) ?? [];
+  const rows = (data as Row[]) ?? [];
 
-  const totalEarlyLeaves = rows.length;
+  const now = new Date();
+  const weekAgo = new Date(now);
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  const monthAgo = new Date(now);
+  monthAgo.setMonth(monthAgo.getMonth() - 1);
 
-  const hoursValues = rows
-    .map((r) => r.hours_worked)
-    .filter((h): h is number => h !== null);
-  const avgHoursWorked =
-    hoursValues.length > 0
-      ? hoursValues.reduce((sum, h) => sum + h, 0) / hoursValues.length
-      : 0;
-
-  const byShift: Record<string, number> = {};
-  for (const row of rows) {
-    byShift[row.shift] = (byShift[row.shift] ?? 0) + 1;
+  let dnrCount = 0;
+  let warningCount = 0;
+  for (const r of rows) {
+    if (r.corrective_action === 'DNR') dnrCount++;
+    if (r.corrective_action === 'Warning') warningCount++;
   }
-
-  const byBranch: Record<string, number> = {};
-  for (const row of rows) {
-    const branch = row.branch ?? 'Unknown';
-    byBranch[branch] = (byBranch[branch] ?? 0) + 1;
-  }
-
-  const eidCounts: Record<string, { eid: string; first_name: string; last_name: string; count: number }> = {};
-  for (const row of rows) {
-    if (!eidCounts[row.eid]) {
-      eidCounts[row.eid] = {
-        eid: row.eid,
-        first_name: row.associate?.first_name ?? '',
-        last_name: row.associate?.last_name ?? '',
-        count: 0,
-      };
-    }
-    eidCounts[row.eid].count += 1;
-  }
-
-  const topOffenders = Object.values(eidCounts)
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
 
   return {
-    total_early_leaves: totalEarlyLeaves,
-    avg_hours_worked: Math.round(avgHoursWorked * 100) / 100,
-    by_shift: byShift,
-    by_branch: byBranch,
-    top_offenders: topOffenders,
+    total_this_week: rows.length,
+    total_this_month: rows.length,
+    dnr_count: dnrCount,
+    warning_count: warningCount,
   };
 }

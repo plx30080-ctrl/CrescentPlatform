@@ -4,34 +4,40 @@ import type { Badge, BadgeWithAssociate, BadgePrintJob, BadgePrintJobWithDetails
 
 export async function getBadges(filters?: {
   status?: BadgeStatus;
-  branch?: string;
-}): Promise<BadgeWithAssociate[]> {
+  page?: number;
+  pageSize?: number;
+}): Promise<{ data: BadgeWithAssociate[]; count: number }> {
   let query = supabase
     .from('badges')
     .select(`
       *,
-      associate:associates!eid (
+      associate:associates!associate_eid (
+        eid,
         first_name,
         last_name,
         branch,
         shift,
         status
       )
-    `);
+    `, { count: 'exact' });
 
   if (filters?.status) {
     query = query.eq('status', filters.status);
   }
 
+  const page = filters?.page ?? 1;
+  const pageSize = filters?.pageSize ?? 25;
+  const from = (page - 1) * pageSize;
+  query = query.range(from, from + pageSize - 1);
   query = query.order('created_at', { ascending: false });
 
-  const { data, error } = await query;
+  const { data, error, count } = await query;
 
   if (error) {
     throw new Error(`Failed to fetch badges: ${error.message}`);
   }
 
-  return (data as BadgeWithAssociate[]) ?? [];
+  return { data: (data as BadgeWithAssociate[]) ?? [], count: count ?? 0 };
 }
 
 export async function getBadge(id: string): Promise<BadgeWithAssociate> {
@@ -39,7 +45,8 @@ export async function getBadge(id: string): Promise<BadgeWithAssociate> {
     .from('badges')
     .select(`
       *,
-      associate:associates!eid (
+      associate:associates!associate_eid (
+        eid,
         first_name,
         last_name,
         branch,
@@ -61,7 +68,7 @@ export async function createBadge(
   eid: string,
   photoUrl?: string | null,
   autoQueue?: boolean
-): Promise<Badge> {
+): Promise<{ success: boolean; badge_id?: string; badge_number?: string; error?: string }> {
   const { data, error } = await supabase.rpc('create_badge_for_associate', {
     p_eid: eid,
     p_photo_url: photoUrl ?? null,
@@ -69,19 +76,19 @@ export async function createBadge(
   });
 
   if (error) {
-    throw new Error(`Failed to create badge for associate ${eid}: ${error.message}`);
+    throw new Error(`Failed to create badge: ${error.message}`);
   }
 
-  return data as Badge;
+  return data as { success: boolean; badge_id?: string; badge_number?: string; error?: string };
 }
 
 export async function updateBadge(
   id: string,
-  updates: Partial<Pick<Badge, 'status' | 'photo_url' | 'template_id' | 'notes' | 'expiry_date' | 'updated_by'>>
+  updates: Partial<Pick<Badge, 'status' | 'photo_url' | 'notes'>>
 ): Promise<Badge> {
   const { data, error } = await supabase
     .from('badges')
-    .update({ ...updates, updated_at: new Date().toISOString() })
+    .update(updates)
     .eq('id', id)
     .select()
     .single();
@@ -94,11 +101,7 @@ export async function updateBadge(
 }
 
 export async function deleteBadge(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('badges')
-    .delete()
-    .eq('id', id);
-
+  const { error } = await supabase.from('badges').delete().eq('id', id);
   if (error) {
     throw new Error(`Failed to delete badge ${id}: ${error.message}`);
   }
@@ -111,12 +114,11 @@ export async function getPrintQueue(status?: PrintQueueStatus): Promise<BadgePri
       *,
       badge:badges!badge_id (
         *,
-        associate:associates!eid (
+        associate:associates!associate_eid (
+          eid,
           first_name,
           last_name,
-          branch,
-          shift,
-          status
+          shift
         )
       )
     `);
@@ -125,7 +127,7 @@ export async function getPrintQueue(status?: PrintQueueStatus): Promise<BadgePri
     query = query.eq('status', status);
   }
 
-  query = query.order('priority', { ascending: false }).order('queued_at', { ascending: true });
+  query = query.order('queued_at', { ascending: true });
 
   const { data, error } = await query;
 
@@ -136,45 +138,30 @@ export async function getPrintQueue(status?: PrintQueueStatus): Promise<BadgePri
   return (data as BadgePrintJobWithDetails[]) ?? [];
 }
 
-export async function addToPrintQueue(
-  badgeId: string,
-  priority?: number
-): Promise<BadgePrintJob> {
+export async function addToPrintQueue(badgeId: string, priority?: string): Promise<BadgePrintJob> {
   const { data, error } = await supabase
     .from('badge_print_queue')
     .insert({
       badge_id: badgeId,
-      status: 'Queued' as PrintQueueStatus,
-      priority: priority ?? 0,
-      queued_at: new Date().toISOString(),
+      priority: priority ?? 'Normal',
     })
     .select()
     .single();
 
   if (error) {
-    throw new Error(`Failed to add badge to print queue: ${error.message}`);
+    throw new Error(`Failed to add to print queue: ${error.message}`);
   }
 
   return data as BadgePrintJob;
 }
 
-export async function updatePrintJob(
-  id: string,
-  status: PrintQueueStatus,
-  errorMessage?: string
-): Promise<BadgePrintJob> {
+export async function updatePrintJob(id: string, status: PrintQueueStatus, errorMsg?: string): Promise<BadgePrintJob> {
   const updates: Record<string, unknown> = { status };
-
-  if (status === 'Printing') {
-    updates.started_at = new Date().toISOString();
-  }
-
   if (status === 'Completed' || status === 'Failed') {
     updates.completed_at = new Date().toISOString();
   }
-
-  if (errorMessage) {
-    updates.error_message = errorMessage;
+  if (errorMsg) {
+    updates.error = errorMsg;
   }
 
   const { data, error } = await supabase
@@ -185,7 +172,7 @@ export async function updatePrintJob(
     .single();
 
   if (error) {
-    throw new Error(`Failed to update print job ${id}: ${error.message}`);
+    throw new Error(`Failed to update print job: ${error.message}`);
   }
 
   return data as BadgePrintJob;
@@ -195,11 +182,10 @@ export async function getTemplates(): Promise<BadgeTemplate[]> {
   const { data, error } = await supabase
     .from('badge_templates')
     .select('*')
-    .order('is_default', { ascending: false })
-    .order('name', { ascending: true });
+    .order('is_default', { ascending: false });
 
   if (error) {
-    throw new Error(`Failed to fetch badge templates: ${error.message}`);
+    throw new Error(`Failed to fetch templates: ${error.message}`);
   }
 
   return (data as BadgeTemplate[]) ?? [];
@@ -207,17 +193,17 @@ export async function getTemplates(): Promise<BadgeTemplate[]> {
 
 export async function updateTemplate(
   id: string,
-  updates: Partial<Pick<BadgeTemplate, 'name' | 'description' | 'layout_config' | 'is_default'>>
+  updates: Partial<Pick<BadgeTemplate, 'name' | 'card_size' | 'elements' | 'is_default'>>
 ): Promise<BadgeTemplate> {
   const { data, error } = await supabase
     .from('badge_templates')
-    .update({ ...updates, updated_at: new Date().toISOString() })
+    .update(updates)
     .eq('id', id)
     .select()
     .single();
 
   if (error) {
-    throw new Error(`Failed to update template ${id}: ${error.message}`);
+    throw new Error(`Failed to update template: ${error.message}`);
   }
 
   return data as BadgeTemplate;

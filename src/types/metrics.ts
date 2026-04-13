@@ -4,91 +4,93 @@ export interface OnPremiseData {
   id: string;
   date: string;
   shift: Shift;
-  branch: string;
-  headcount: number;
-  target_headcount: number;
-  absent_count: number;
-  ncns_count: number;
-  early_leave_count: number;
-  new_start_count: number;
+  requested: number;
+  required: number;
+  working: number;
+  new_starts: number;
+  send_homes: number;
+  line_cuts: number;
   notes: string | null;
   submitted_by: string | null;
-  created_at: string;
-  updated_at: string;
+  submitted_at: string;
 }
 
 export interface OnPremiseNewStart {
   id: string;
   on_premise_id: string;
-  eid: string;
-  first_name: string;
-  last_name: string;
-  status: string;
-  notes: string | null;
-  created_at: string;
+  associate_eid: string;
+  validated: boolean;
+  validation_message: string | null;
 }
 
 export interface HoursData {
   id: string;
   week_ending: string;
-  branch: string;
-  total_hours: number;
-  regular_hours: number;
-  overtime_hours: number;
-  total_employees: number;
-  avg_hours_per_employee: number;
-  notes: string | null;
+  shift1_total: number;
+  shift1_direct: number;
+  shift1_indirect: number;
+  shift2_total: number;
+  shift2_direct: number;
+  shift2_indirect: number;
+  employee_count: number;
   submitted_by: string | null;
-  created_at: string;
-  updated_at: string;
+  submitted_at: string;
 }
 
 export interface HoursEmployeeDetail {
   id: string;
   hours_data_id: string;
-  eid: string;
-  first_name: string;
-  last_name: string;
+  associate_eid: string;
+  shift: Shift | null;
+  labor_type: 'Direct' | 'Indirect' | null;
+  total_hours: number;
   regular_hours: number;
   overtime_hours: number;
-  total_hours: number;
-  shift: Shift | null;
-  created_at: string;
+  daily_breakdown: Record<string, number> | null;
 }
 
 export interface BranchMetrics {
   id: string;
-  date: string;
+  date: string | null;
+  week_ending: string | null;
   branch: string;
-  revenue: number | null;
-  gp_margin: number | null;
-  bill_rate: number | null;
-  pay_rate: number | null;
-  spread: number | null;
-  fill_rate: number | null;
-  turnover_rate: number | null;
-  avg_tenure_days: number | null;
+  is_weekly_summary: boolean;
+  interviews_scheduled: number;
+  interview_shows: number;
+  shift1_processed: number;
+  shift2_processed: number;
+  shift2_confirmations: number;
+  next_day_confirmations: number;
+  total_applicants: number | null;
+  total_processed: number | null;
+  total_headcount: number | null;
+  on_premise_count: number | null;
+  scheduled_count: number | null;
+  attendance_pct: number | null;
   notes: string | null;
   submitted_by: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface DashboardSummary {
-  total_active_associates: number;
-  total_headcount_today: number;
-  target_headcount_today: number;
-  fill_rate: number;
-  absent_count: number;
-  ncns_count: number;
-  early_leave_count: number;
-  new_starts_this_week: number;
-  pipeline_counts: Record<string, number>;
+  submitted_at: string;
 }
 
 export interface HeadcountTrendPoint {
   date: string;
-  shift: Shift;
-  headcount: number;
-  target_headcount: number;
+  shift: string;
+  requested: number;
+  required: number;
+  working: number;
+  fill_rate: number;
+}
+
+export interface DashboardSummary {
+  total_associates: number;
+  total_dnr: number;
+  pipeline: Record<string, number> | null;
+  headcount_trend: HeadcountTrendPoint[];
+  recent_early_leaves: Array<{
+    date: string;
+    eid: string;
+    name: string;
+    reason: string | null;
+    corrective_action: string;
+  }>;
 }

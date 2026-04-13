@@ -1,9 +1,9 @@
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import { useAuth } from '../../contexts/AuthContext';
 
-export default function PrivateRoute({ children }: { children: React.ReactNode }) {
+export default function PrivateRoute() {
   const { user, loading } = useAuth();
   const location = useLocation();
 
@@ -26,5 +26,5 @@ export default function PrivateRoute({ children }: { children: React.ReactNode }
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  return <>{children}</>;
+  return <Outlet />;
 }

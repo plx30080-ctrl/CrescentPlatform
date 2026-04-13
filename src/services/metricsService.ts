@@ -25,111 +25,76 @@ export async function getOnPremiseData(
   }
 
   query = query.order('date', { ascending: false });
-
   const { data, error } = await query;
 
-  if (error) {
-    throw new Error(`Failed to fetch on-premise data: ${error.message}`);
-  }
-
+  if (error) throw new Error(`Failed to fetch on-premise data: ${error.message}`);
   return (data as OnPremiseData[]) ?? [];
 }
 
 export async function submitOnPremiseData(params: {
   date: string;
   shift: Shift;
-  branch: string;
-  headcount: number;
-  target_headcount: number;
-  absent_count: number;
-  ncns_count: number;
-  early_leave_count: number;
-  new_start_count: number;
+  requested: number;
+  required: number;
+  working: number;
+  new_starts: number;
+  send_homes?: number;
+  line_cuts?: number;
+  new_start_eids?: string[];
   notes?: string;
   submitted_by?: string;
-}): Promise<OnPremiseData> {
+}): Promise<{ success: boolean; on_premise_id?: string; error?: string }> {
   const { data, error } = await supabase.rpc('submit_on_premise_data', {
     p_date: params.date,
     p_shift: params.shift,
-    p_branch: params.branch,
-    p_headcount: params.headcount,
-    p_target_headcount: params.target_headcount,
-    p_absent_count: params.absent_count,
-    p_ncns_count: params.ncns_count,
-    p_early_leave_count: params.early_leave_count,
-    p_new_start_count: params.new_start_count,
+    p_requested: params.requested,
+    p_required: params.required,
+    p_working: params.working,
+    p_new_starts: params.new_starts,
+    p_send_homes: params.send_homes ?? 0,
+    p_line_cuts: params.line_cuts ?? 0,
+    p_new_start_eids: params.new_start_eids ?? [],
     p_notes: params.notes ?? null,
     p_submitted_by: params.submitted_by ?? null,
   });
 
-  if (error) {
-    throw new Error(`Failed to submit on-premise data: ${error.message}`);
-  }
-
-  return data as OnPremiseData;
+  if (error) throw new Error(`Failed to submit on-premise data: ${error.message}`);
+  return data as { success: boolean; on_premise_id?: string; error?: string };
 }
 
-export async function getHoursData(
-  startDate?: string,
-  endDate?: string
-): Promise<HoursData[]> {
-  let query = supabase
-    .from('hours_data')
-    .select('*');
-
-  if (startDate) {
-    query = query.gte('week_ending', startDate);
-  }
-
-  if (endDate) {
-    query = query.lte('week_ending', endDate);
-  }
-
+export async function getHoursData(startDate?: string, endDate?: string): Promise<HoursData[]> {
+  let query = supabase.from('hours_data').select('*');
+  if (startDate) query = query.gte('week_ending', startDate);
+  if (endDate) query = query.lte('week_ending', endDate);
   query = query.order('week_ending', { ascending: false });
 
   const { data, error } = await query;
-
-  if (error) {
-    throw new Error(`Failed to fetch hours data: ${error.message}`);
-  }
-
+  if (error) throw new Error(`Failed to fetch hours data: ${error.message}`);
   return (data as HoursData[]) ?? [];
 }
 
 export async function submitHoursData(
-  hoursData: Omit<HoursData, 'id' | 'created_at' | 'updated_at'>,
-  employeeDetails: Omit<HoursEmployeeDetail, 'id' | 'hours_data_id' | 'created_at'>[]
-): Promise<{ hoursData: HoursData; employeeDetails: HoursEmployeeDetail[] }> {
-  const { data: insertedHours, error: hoursError } = await supabase
+  hoursData: Omit<HoursData, 'id' | 'submitted_at'>,
+  employeeDetails: Omit<HoursEmployeeDetail, 'id' | 'hours_data_id'>[]
+): Promise<{ hoursData: HoursData; employeeCount: number }> {
+  const { data: inserted, error: hErr } = await supabase
     .from('hours_data')
-    .insert(hoursData)
+    .upsert(hoursData, { onConflict: 'week_ending' })
     .select()
     .single();
 
-  if (hoursError) {
-    throw new Error(`Failed to submit hours data: ${hoursError.message}`);
+  if (hErr) throw new Error(`Failed to submit hours data: ${hErr.message}`);
+  const typedHours = inserted as HoursData;
+
+  if (employeeDetails.length > 0) {
+    const rows = employeeDetails.map((d) => ({ ...d, hours_data_id: typedHours.id }));
+    const { error: dErr } = await supabase.from('hours_employee_detail').upsert(rows, {
+      onConflict: 'hours_data_id,associate_eid,labor_type',
+    });
+    if (dErr) throw new Error(`Failed to submit employee details: ${dErr.message}`);
   }
 
-  const typedHours = insertedHours as HoursData;
-
-  const detailsWithId = employeeDetails.map((detail) => ({
-    ...detail,
-    hours_data_id: typedHours.id,
-  }));
-
-  const { data: insertedDetails, error: detailsError } = await supabase
-    .from('hours_employee_detail')
-    .insert(detailsWithId)
-    .select();
-
-  if (detailsError) {
-    throw new Error(`Failed to submit employee details: ${detailsError.message}`);
-  }
-
-  return {
-    hoursData: typedHours,
-    employeeDetails: (insertedDetails as HoursEmployeeDetail[]) ?? [],
-  };
+  return { hoursData: typedHours, employeeCount: employeeDetails.length };
 }
 
 export async function getBranchMetrics(
@@ -137,35 +102,19 @@ export async function getBranchMetrics(
   endDate?: string,
   branch?: string
 ): Promise<BranchMetrics[]> {
-  let query = supabase
-    .from('branch_metrics')
-    .select('*');
-
-  if (startDate) {
-    query = query.gte('date', startDate);
-  }
-
-  if (endDate) {
-    query = query.lte('date', endDate);
-  }
-
-  if (branch) {
-    query = query.eq('branch', branch);
-  }
-
+  let query = supabase.from('branch_metrics').select('*');
+  if (startDate) query = query.gte('date', startDate);
+  if (endDate) query = query.lte('date', endDate);
+  if (branch) query = query.eq('branch', branch);
   query = query.order('date', { ascending: false });
 
   const { data, error } = await query;
-
-  if (error) {
-    throw new Error(`Failed to fetch branch metrics: ${error.message}`);
-  }
-
+  if (error) throw new Error(`Failed to fetch branch metrics: ${error.message}`);
   return (data as BranchMetrics[]) ?? [];
 }
 
 export async function submitBranchMetrics(
-  metrics: Omit<BranchMetrics, 'id' | 'created_at' | 'updated_at'>
+  metrics: Omit<BranchMetrics, 'id' | 'submitted_at'>
 ): Promise<BranchMetrics> {
   const { data, error } = await supabase
     .from('branch_metrics')
@@ -173,10 +122,7 @@ export async function submitBranchMetrics(
     .select()
     .single();
 
-  if (error) {
-    throw new Error(`Failed to submit branch metrics: ${error.message}`);
-  }
-
+  if (error) throw new Error(`Failed to submit branch metrics: ${error.message}`);
   return data as BranchMetrics;
 }
 
@@ -185,64 +131,58 @@ export async function getDashboardSummary(
   endDate?: string
 ): Promise<DashboardSummary> {
   const { data, error } = await supabase.rpc('get_dashboard_summary', {
-    p_start_date: startDate ?? null,
-    p_end_date: endDate ?? null,
+    p_start_date: startDate ?? undefined,
+    p_end_date: endDate ?? undefined,
   });
 
-  if (error) {
-    throw new Error(`Failed to fetch dashboard summary: ${error.message}`);
-  }
-
+  if (error) throw new Error(`Failed to fetch dashboard summary: ${error.message}`);
   return data as DashboardSummary;
 }
 
 export async function getHeadcountTrend(days?: number): Promise<HeadcountTrendPoint[]> {
-  const lookbackDays = days ?? 30;
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - lookbackDays);
-  const startDateStr = startDate.toISOString().split('T')[0];
+  const lookback = days ?? 30;
+  const start = new Date();
+  start.setDate(start.getDate() - lookback);
+  const startStr = start.toISOString().split('T')[0];
 
   const { data, error } = await supabase
     .from('on_premise_data')
-    .select('date, shift, headcount, target_headcount')
-    .gte('date', startDateStr)
+    .select('date, shift, requested, required, working')
+    .gte('date', startStr)
     .order('date', { ascending: true });
 
-  if (error) {
-    throw new Error(`Failed to fetch headcount trend: ${error.message}`);
-  }
+  if (error) throw new Error(`Failed to fetch headcount trend: ${error.message}`);
 
-  return (data as HeadcountTrendPoint[]) ?? [];
+  return ((data ?? []) as Array<{ date: string; shift: string; requested: number; required: number; working: number }>).map((r) => ({
+    date: r.date,
+    shift: r.shift,
+    requested: r.requested,
+    required: r.required,
+    working: r.working,
+    fill_rate: r.required > 0 ? Math.round((r.working / r.required) * 100 * 10) / 10 : 0,
+  }));
 }
 
 export async function getFillRates(
   startDate: string,
   endDate: string,
   shift?: Shift
-): Promise<Array<{ date: string; shift: Shift; fill_rate: number }>> {
+): Promise<Array<{ date: string; shift: string; fill_rate: number }>> {
   let query = supabase
     .from('on_premise_data')
-    .select('date, shift, headcount, target_headcount')
+    .select('date, shift, required, working')
     .gte('date', startDate)
     .lte('date', endDate);
 
-  if (shift) {
-    query = query.eq('shift', shift);
-  }
-
+  if (shift) query = query.eq('shift', shift);
   query = query.order('date', { ascending: true });
 
   const { data, error } = await query;
+  if (error) throw new Error(`Failed to fetch fill rates: ${error.message}`);
 
-  if (error) {
-    throw new Error(`Failed to fetch fill rates: ${error.message}`);
-  }
-
-  const rows = (data as Array<{ date: string; shift: Shift; headcount: number; target_headcount: number }>) ?? [];
-
-  return rows.map((row) => ({
-    date: row.date,
-    shift: row.shift,
-    fill_rate: row.target_headcount > 0 ? (row.headcount / row.target_headcount) * 100 : 0,
+  return ((data ?? []) as Array<{ date: string; shift: string; required: number; working: number }>).map((r) => ({
+    date: r.date,
+    shift: r.shift,
+    fill_rate: r.required > 0 ? Math.round((r.working / r.required) * 100 * 10) / 10 : 0,
   }));
 }
