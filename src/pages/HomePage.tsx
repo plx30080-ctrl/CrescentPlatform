@@ -128,10 +128,10 @@ export default function HomePage() {
   }, []);
 
   const pipelineChartData = useMemo(() => {
-    if (!summary?.pipeline_counts) return null;
+    if (!summary?.pipeline) return null;
 
-    const labels = Object.keys(summary.pipeline_counts);
-    const values = Object.values(summary.pipeline_counts);
+    const labels = Object.keys(summary.pipeline);
+    const values = Object.values(summary.pipeline);
     const colors = labels.map((l) => PIPELINE_COLORS[l] ?? '#9e9e9e');
 
     return {
@@ -148,8 +148,8 @@ export default function HomePage() {
   }, [summary]);
 
   const pipelineTotal = useMemo(() => {
-    if (!summary?.pipeline_counts) return 0;
-    return Object.values(summary.pipeline_counts).reduce((acc, v) => acc + v, 0);
+    if (!summary?.pipeline) return 0;
+    return Object.values(summary.pipeline).reduce((acc: number, v: number) => acc + v, 0);
   }, [summary]);
 
   if (loading) {
@@ -164,11 +164,11 @@ export default function HomePage() {
     return <Alert severity="error">{error}</Alert>;
   }
 
-  const fillRate = summary
-    ? summary.target_headcount_today > 0
-      ? Math.round((summary.total_headcount_today / summary.target_headcount_today) * 100)
-      : 0
-    : 0;
+  const fillRate = useMemo(() => {
+    if (!summary?.headcount_trend || summary.headcount_trend.length === 0) return 0;
+    const latest = summary.headcount_trend[summary.headcount_trend.length - 1];
+    return latest.required > 0 ? Math.round((latest.working / latest.required) * 100) : 0;
+  }, [summary]);
 
   return (
     <Box>
@@ -181,7 +181,7 @@ export default function HomePage() {
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <StatCard
             title="Active Associates"
-            value={summary?.total_active_associates ?? 0}
+            value={summary?.total_associates ?? 0}
             icon={<PeopleIcon sx={{ fontSize: 28 }} />}
             color="#5C2D91"
           />
@@ -205,7 +205,7 @@ export default function HomePage() {
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <StatCard
             title="Early Leaves This Week"
-            value={summary?.early_leave_count ?? 0}
+            value={summary?.recent_early_leaves?.length ?? 0}
             icon={<EventBusyIcon sx={{ fontSize: 28 }} />}
             color="#ed6c02"
           />
@@ -299,17 +299,17 @@ export default function HomePage() {
                       <TableCell>
                         {leave.associate
                           ? `${leave.associate.first_name} ${leave.associate.last_name}`
-                          : leave.eid}
+                          : leave.associate_eid}
                       </TableCell>
-                      <TableCell>{leave.eid}</TableCell>
+                      <TableCell>{leave.associate_eid}</TableCell>
                       <TableCell>
                         <Chip
                           label={leave.shift}
                           size="small"
-                          color={STATUS_COLORS[leave.shift] ?? 'default'}
+                          color={STATUS_COLORS[leave.shift ?? ''] ?? 'default'}
                         />
                       </TableCell>
-                      <TableCell>{leave.time_left}</TableCell>
+                      <TableCell>{leave.leave_time}</TableCell>
                       <TableCell>{leave.reason ?? '-'}</TableCell>
                     </TableRow>
                   ))}

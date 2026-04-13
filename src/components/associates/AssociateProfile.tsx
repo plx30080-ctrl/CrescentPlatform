@@ -23,7 +23,6 @@ import {
   Paper,
   Divider,
   IconButton,
-  Tooltip,
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -290,10 +289,10 @@ export default function AssociateProfile() {
                     />
                   </Typography>
                   <Typography variant="body2">
-                    Issued: {formatDate(badge.issued_date) || 'Pending'}
+                    Issued: {formatDate(badge.issued_at) || 'Pending'}
                   </Typography>
                   <Typography variant="body2">
-                    Expires: {formatDate(badge.expiry_date) || 'N/A'}
+                    Created: {formatDate(badge.created_at) || 'N/A'}
                   </Typography>
                 </Box>
               ) : (
@@ -356,7 +355,7 @@ export default function AssociateProfile() {
                         <TableRow key={leave.id} hover>
                           <TableCell>{formatDate(leave.date)}</TableCell>
                           <TableCell>{leave.shift}</TableCell>
-                          <TableCell>{leave.time_left}</TableCell>
+                          <TableCell>{leave.leave_time}</TableCell>
                           <TableCell>
                             {leave.hours_worked != null ? leave.hours_worked.toFixed(1) : '-'}
                           </TableCell>
@@ -394,13 +393,13 @@ export default function AssociateProfile() {
                           <TableCell>{formatDate(action.date)}</TableCell>
                           <TableCell>
                             <Chip
-                              label={action.action_type}
+                              label={action.action}
                               size="small"
-                              color={STATUS_COLORS[action.action_type] ?? 'default'}
+                              color={STATUS_COLORS[action.action] ?? 'default'}
                             />
                           </TableCell>
-                          <TableCell>{action.reason ?? '-'}</TableCell>
-                          <TableCell>{action.issued_by ?? '-'}</TableCell>
+                          <TableCell>{action.offense_category ?? '-'}</TableCell>
+                          <TableCell>{action.created_by ?? '-'}</TableCell>
                           <TableCell>{action.notes ?? '-'}</TableCell>
                         </TableRow>
                       ))}

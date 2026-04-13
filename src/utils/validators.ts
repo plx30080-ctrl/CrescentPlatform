@@ -27,15 +27,15 @@ export const associateSchema = z.object({
     .nullish()
     .or(z.literal('')),
   status: z.enum(['Active', 'Inactive', 'DNR', 'Terminated'], {
-    errorMap: () => ({ message: 'Invalid associate status' }),
+    message: 'Invalid associate status',
   }),
   pipeline_status: z.enum(
     ['Applied', 'Interviewing', 'Background Check', 'Orientation', 'Started', 'Declined'],
-    { errorMap: () => ({ message: 'Invalid pipeline status' }) }
+    { message: 'Invalid pipeline status' }
   ),
   shift: z
     .enum(['1st', '2nd'], {
-      errorMap: () => ({ message: 'Shift must be 1st or 2nd' }),
+      message: 'Shift must be 1st or 2nd',
     })
     .nullish(),
   branch: z
@@ -68,7 +68,7 @@ export type AssociateInput = z.infer<typeof associateSchema>;
 export const onPremiseSchema = z.object({
   date: z.string().min(1, 'Date is required'),
   shift: z.enum(['1st', '2nd'], {
-    errorMap: () => ({ message: 'Shift must be 1st or 2nd' }),
+    message: 'Shift must be 1st or 2nd',
   }),
   requested: z.coerce.number().int().min(0, 'Requested must be 0 or greater').default(0),
   required: z.coerce.number().int().min(0, 'Required must be 0 or greater').default(0),
@@ -89,7 +89,7 @@ export const earlyLeaveSchema = z.object({
   date: z.string().min(1, 'Date is required'),
   shift: z
     .enum(['1st', '2nd'], {
-      errorMap: () => ({ message: 'Shift must be 1st or 2nd' }),
+      message: 'Shift must be 1st or 2nd',
     })
     .nullish(),
   leave_time: z.string().nullish(),
@@ -98,7 +98,7 @@ export const earlyLeaveSchema = z.object({
   reason: z.string().max(500, 'Reason must be 500 characters or fewer').nullish(),
   corrective_action: z
     .enum(['None', 'Warning', '5 Day Suspension', 'DNR'], {
-      errorMap: () => ({ message: 'Invalid corrective action' }),
+      message: 'Invalid corrective action',
     })
     .default('None'),
   notes: z.string().max(2000, 'Notes must be 2000 characters or fewer').nullish(),

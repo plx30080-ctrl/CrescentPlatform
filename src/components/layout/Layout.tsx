@@ -145,7 +145,7 @@ export default function Layout() {
                 </ListItemIcon>
                 <ListItemText
                   primary={item.label}
-                  primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: isActive ? 600 : 400 }}
+                  slotProps={{ primary: { sx: { fontSize: '0.9rem', fontWeight: isActive ? 600 : 400 } } }}
                 />
               </ListItemButton>
             </ListItem>

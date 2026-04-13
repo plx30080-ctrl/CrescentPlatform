@@ -70,8 +70,8 @@ export default function BadgeManagementPage() {
     try {
       setLoading(true);
       setError(null);
-      const data = await getBadges();
-      setBadges(data);
+      const result = await getBadges();
+      setBadges(result.data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load badges');
     } finally {
@@ -239,9 +239,9 @@ export default function BadgeManagementPage() {
                             <TableCell>
                               {b.associate
                                 ? `${b.associate.first_name} ${b.associate.last_name}`
-                                : b.eid}
+                                : b.associate_eid}
                             </TableCell>
-                            <TableCell>{b.eid}</TableCell>
+                            <TableCell>{b.associate_eid}</TableCell>
                             <TableCell>
                               <Chip
                                 label={b.status}
@@ -296,7 +296,7 @@ export default function BadgeManagementPage() {
                         associate={{
                           first_name: selectedBadge.associate?.first_name ?? '',
                           last_name: selectedBadge.associate?.last_name ?? '',
-                          eid: selectedBadge.eid,
+                          eid: selectedBadge.associate_eid,
                           shift: selectedBadge.associate?.shift,
                         }}
                         photoUrl={selectedBadge.photo_url}
@@ -356,7 +356,7 @@ export default function BadgeManagementPage() {
                             ? `${job.badge.associate.first_name} ${job.badge.associate.last_name}`
                             : job.badge_id.slice(0, 8)}
                         </TableCell>
-                        <TableCell>{job.badge?.eid ?? '-'}</TableCell>
+                        <TableCell>{job.badge?.associate_eid ?? '-'}</TableCell>
                         <TableCell>
                           <Chip
                             label={job.status}
@@ -430,11 +430,11 @@ export default function BadgeManagementPage() {
                 placeholder="Type name or EID..."
                 slotProps={{
                   input: {
-                    ...params.InputProps,
+                    ...params.slotProps?.input,
                     endAdornment: (
                       <>
                         {searching && <CircularProgress color="inherit" size={20} />}
-                        {params.InputProps.endAdornment}
+                        {(params.slotProps?.input as Record<string, unknown>)?.endAdornment}
                       </>
                     ),
                   },

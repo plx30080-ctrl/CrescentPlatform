@@ -138,13 +138,12 @@ function OnPremiseForm({
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
     shift: '1st' as Shift,
-    branch: '',
-    headcount: '',
-    target_headcount: '',
-    absent_count: '',
-    ncns_count: '',
-    early_leave_count: '',
-    new_start_count: '',
+    requested: '',
+    required: '',
+    working: '',
+    new_starts: '',
+    send_homes: '',
+    line_cuts: '',
     notes: '',
   });
   const [submitting, setSubmitting] = useState(false);
@@ -160,26 +159,24 @@ function OnPremiseForm({
       await submitOnPremiseData({
         date: form.date,
         shift: form.shift,
-        branch: form.branch,
-        headcount: parseInt(form.headcount) || 0,
-        target_headcount: parseInt(form.target_headcount) || 0,
-        absent_count: parseInt(form.absent_count) || 0,
-        ncns_count: parseInt(form.ncns_count) || 0,
-        early_leave_count: parseInt(form.early_leave_count) || 0,
-        new_start_count: parseInt(form.new_start_count) || 0,
+        requested: parseInt(form.requested) || 0,
+        required: parseInt(form.required) || 0,
+        working: parseInt(form.working) || 0,
+        new_starts: parseInt(form.new_starts) || 0,
+        send_homes: parseInt(form.send_homes) || 0,
+        line_cuts: parseInt(form.line_cuts) || 0,
         notes: form.notes || undefined,
       });
       onSuccess();
       setForm({
         date: new Date().toISOString().split('T')[0],
         shift: '1st',
-        branch: form.branch,
-        headcount: '',
-        target_headcount: '',
-        absent_count: '',
-        ncns_count: '',
-        early_leave_count: '',
-        new_start_count: '',
+        requested: '',
+        required: '',
+        working: '',
+        new_starts: '',
+        send_homes: '',
+        line_cuts: '',
         notes: '',
       });
     } catch (err) {
@@ -220,9 +217,10 @@ function OnPremiseForm({
         <Grid size={{ xs: 12, sm: 4 }}>
           <TextField
             fullWidth
-            label="Branch"
-            value={form.branch}
-            onChange={(e) => handleChange('branch', e.target.value)}
+            label="Requested"
+            type="number"
+            value={form.requested}
+            onChange={(e) => handleChange('requested', e.target.value)}
             required
           />
         </Grid>
@@ -230,58 +228,49 @@ function OnPremiseForm({
         <Grid size={{ xs: 12, sm: 4 }}>
           <TextField
             fullWidth
-            label="Headcount (Working)"
+            label="Required"
             type="number"
-            value={form.headcount}
-            onChange={(e) => handleChange('headcount', e.target.value)}
+            value={form.required}
+            onChange={(e) => handleChange('required', e.target.value)}
             required
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 4 }}>
           <TextField
             fullWidth
-            label="Target Headcount"
+            label="Working"
             type="number"
-            value={form.target_headcount}
-            onChange={(e) => handleChange('target_headcount', e.target.value)}
+            value={form.working}
+            onChange={(e) => handleChange('working', e.target.value)}
             required
-          />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 4 }}>
-          <TextField
-            fullWidth
-            label="Absent Count"
-            type="number"
-            value={form.absent_count}
-            onChange={(e) => handleChange('absent_count', e.target.value)}
           />
         </Grid>
 
         <Grid size={{ xs: 12, sm: 4 }}>
           <TextField
             fullWidth
-            label="NCNS Count"
+            label="New Starts"
             type="number"
-            value={form.ncns_count}
-            onChange={(e) => handleChange('ncns_count', e.target.value)}
+            value={form.new_starts}
+            onChange={(e) => handleChange('new_starts', e.target.value)}
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 4 }}>
           <TextField
             fullWidth
-            label="Early Leave Count"
+            label="Send Homes"
             type="number"
-            value={form.early_leave_count}
-            onChange={(e) => handleChange('early_leave_count', e.target.value)}
+            value={form.send_homes}
+            onChange={(e) => handleChange('send_homes', e.target.value)}
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 4 }}>
           <TextField
             fullWidth
-            label="New Start Count"
+            label="Line Cuts"
             type="number"
-            value={form.new_start_count}
-            onChange={(e) => handleChange('new_start_count', e.target.value)}
+            value={form.line_cuts}
+            onChange={(e) => handleChange('line_cuts', e.target.value)}
           />
         </Grid>
 
@@ -325,14 +314,14 @@ function BranchMetricsForm({
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
     branch: '',
-    revenue: '',
-    gp_margin: '',
-    bill_rate: '',
-    pay_rate: '',
-    spread: '',
-    fill_rate: '',
-    turnover_rate: '',
-    avg_tenure_days: '',
+    week_ending: '',
+    is_weekly_summary: false,
+    interviews_scheduled: '',
+    interview_shows: '',
+    shift1_processed: '',
+    shift2_processed: '',
+    shift2_confirmations: '',
+    next_day_confirmations: '',
     notes: '',
   });
   const [submitting, setSubmitting] = useState(false);
@@ -341,26 +330,27 @@ function BranchMetricsForm({
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const parseNum = (v: string): number | null => {
-    const n = parseFloat(v);
-    return isNaN(n) ? null : n;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setSubmitting(true);
       await submitBranchMetrics({
-        date: form.date,
+        date: form.date || null,
+        week_ending: form.week_ending || null,
         branch: form.branch,
-        revenue: parseNum(form.revenue),
-        gp_margin: parseNum(form.gp_margin),
-        bill_rate: parseNum(form.bill_rate),
-        pay_rate: parseNum(form.pay_rate),
-        spread: parseNum(form.spread),
-        fill_rate: parseNum(form.fill_rate),
-        turnover_rate: parseNum(form.turnover_rate),
-        avg_tenure_days: parseNum(form.avg_tenure_days),
+        is_weekly_summary: form.is_weekly_summary,
+        interviews_scheduled: parseInt(form.interviews_scheduled) || 0,
+        interview_shows: parseInt(form.interview_shows) || 0,
+        shift1_processed: parseInt(form.shift1_processed) || 0,
+        shift2_processed: parseInt(form.shift2_processed) || 0,
+        shift2_confirmations: parseInt(form.shift2_confirmations) || 0,
+        next_day_confirmations: parseInt(form.next_day_confirmations) || 0,
+        total_applicants: null,
+        total_processed: null,
+        total_headcount: null,
+        on_premise_count: null,
+        scheduled_count: null,
+        attendance_pct: null,
         notes: form.notes || null,
         submitted_by: null,
       });
@@ -368,14 +358,14 @@ function BranchMetricsForm({
       setForm({
         date: new Date().toISOString().split('T')[0],
         branch: form.branch,
-        revenue: '',
-        gp_margin: '',
-        bill_rate: '',
-        pay_rate: '',
-        spread: '',
-        fill_rate: '',
-        turnover_rate: '',
-        avg_tenure_days: '',
+        week_ending: '',
+        is_weekly_summary: false,
+        interviews_scheduled: '',
+        interview_shows: '',
+        shift1_processed: '',
+        shift2_processed: '',
+        shift2_confirmations: '',
+        next_day_confirmations: '',
         notes: '',
       });
     } catch (err) {
@@ -412,82 +402,56 @@ function BranchMetricsForm({
         <Grid size={{ xs: 12, sm: 4 }}>
           <TextField
             fullWidth
-            label="Revenue"
+            label="Interviews Scheduled"
             type="number"
-            value={form.revenue}
-            onChange={(e) => handleChange('revenue', e.target.value)}
-            slotProps={{ input: { inputProps: { step: '0.01' } } }}
+            value={form.interviews_scheduled}
+            onChange={(e) => handleChange('interviews_scheduled', e.target.value)}
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 4 }}>
           <TextField
             fullWidth
-            label="GP Margin (%)"
+            label="Interview Shows"
             type="number"
-            value={form.gp_margin}
-            onChange={(e) => handleChange('gp_margin', e.target.value)}
-            slotProps={{ input: { inputProps: { step: '0.01' } } }}
+            value={form.interview_shows}
+            onChange={(e) => handleChange('interview_shows', e.target.value)}
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 4 }}>
           <TextField
             fullWidth
-            label="Fill Rate (%)"
+            label="Shift 1 Processed"
             type="number"
-            value={form.fill_rate}
-            onChange={(e) => handleChange('fill_rate', e.target.value)}
-            slotProps={{ input: { inputProps: { step: '0.1' } } }}
+            value={form.shift1_processed}
+            onChange={(e) => handleChange('shift1_processed', e.target.value)}
           />
         </Grid>
 
         <Grid size={{ xs: 12, sm: 4 }}>
           <TextField
             fullWidth
-            label="Bill Rate"
+            label="Shift 2 Processed"
             type="number"
-            value={form.bill_rate}
-            onChange={(e) => handleChange('bill_rate', e.target.value)}
-            slotProps={{ input: { inputProps: { step: '0.01' } } }}
+            value={form.shift2_processed}
+            onChange={(e) => handleChange('shift2_processed', e.target.value)}
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 4 }}>
           <TextField
             fullWidth
-            label="Pay Rate"
+            label="Shift 2 Confirmations"
             type="number"
-            value={form.pay_rate}
-            onChange={(e) => handleChange('pay_rate', e.target.value)}
-            slotProps={{ input: { inputProps: { step: '0.01' } } }}
+            value={form.shift2_confirmations}
+            onChange={(e) => handleChange('shift2_confirmations', e.target.value)}
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 4 }}>
           <TextField
             fullWidth
-            label="Spread"
+            label="Next Day Confirmations"
             type="number"
-            value={form.spread}
-            onChange={(e) => handleChange('spread', e.target.value)}
-            slotProps={{ input: { inputProps: { step: '0.01' } } }}
-          />
-        </Grid>
-
-        <Grid size={{ xs: 12, sm: 6 }}>
-          <TextField
-            fullWidth
-            label="Turnover Rate (%)"
-            type="number"
-            value={form.turnover_rate}
-            onChange={(e) => handleChange('turnover_rate', e.target.value)}
-            slotProps={{ input: { inputProps: { step: '0.1' } } }}
-          />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6 }}>
-          <TextField
-            fullWidth
-            label="Avg Tenure (days)"
-            type="number"
-            value={form.avg_tenure_days}
-            onChange={(e) => handleChange('avg_tenure_days', e.target.value)}
+            value={form.next_day_confirmations}
+            onChange={(e) => handleChange('next_day_confirmations', e.target.value)}
           />
         </Grid>
 

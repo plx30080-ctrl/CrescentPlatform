@@ -178,7 +178,7 @@ export default function ColumnMapper({
                 bgcolor: currentTarget ? 'action.hover' : 'background.paper',
               }}
             >
-              <Grid container spacing={2} alignItems="center">
+              <Grid container spacing={2} sx={{ alignItems: 'center' }}>
                 <Grid size={{ xs: 12, sm: 5 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Typography

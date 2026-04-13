@@ -2,7 +2,6 @@ import { supabase } from '../lib/supabase';
 import type {
   EarlyLeave,
   EarlyLeaveWithAssociate,
-  CorrectiveAction,
   CorrectiveActionWithAssociate,
   EarlyLeaveFilters,
   EarlyLeaveStats,
@@ -186,7 +185,7 @@ export async function getEarlyLeaveStats(
     associate: { first_name: string; last_name: string } | null;
   };
 
-  const rows = (data as Row[]) ?? [];
+  const rows = (data as unknown as Row[]) ?? [];
 
   const now = new Date();
   const weekAgo = new Date(now);
