@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase';
 import type {
   EarlyLeave,
   EarlyLeaveWithAssociate,
+  CorrectiveAction,
   CorrectiveActionWithAssociate,
   EarlyLeaveFilters,
   EarlyLeaveStats,
@@ -142,6 +143,19 @@ export async function getCorrectiveActions(
   return (data as CorrectiveActionWithAssociate[]) ?? [];
 }
 
+export async function createCorrectiveAction(
+  ca: Omit<CorrectiveAction, 'id' | 'created_at'>
+): Promise<CorrectiveAction> {
+  const { data, error } = await supabase
+    .from('corrective_actions')
+    .insert(ca)
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to create corrective action: ${error.message}`);
+  return data as CorrectiveAction;
+}
+
 export async function getEarlyLeaveStats(
   startDate?: string,
   endDate?: string
@@ -186,12 +200,6 @@ export async function getEarlyLeaveStats(
   };
 
   const rows = (data as unknown as Row[]) ?? [];
-
-  const now = new Date();
-  const weekAgo = new Date(now);
-  weekAgo.setDate(weekAgo.getDate() - 7);
-  const monthAgo = new Date(now);
-  monthAgo.setMonth(monthAgo.getMonth() - 1);
 
   let dnrCount = 0;
   let warningCount = 0;

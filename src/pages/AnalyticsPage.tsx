@@ -35,7 +35,6 @@ import {
   getHoursData,
   getBranchMetrics,
 } from '../services/metricsService';
-import { getEarlyLeaveStats } from '../services/earlyLeaveService';
 import { SHIFTS } from '../lib/constants';
 import type { Shift } from '../lib/constants';
 import type { HeadcountTrendPoint, HoursData, BranchMetrics } from '../types/metrics';
@@ -52,6 +51,16 @@ ChartJS.register(
   Legend,
   Filler,
 );
+
+function EmptyState({ message = 'No data available for the selected period.' }: { message?: string }) {
+  return (
+    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+      <Typography variant="body1" color="text.secondary">
+        {message}
+      </Typography>
+    </Box>
+  );
+}
 
 function getDefaultDateRange(daysBack: number): { start: string; end: string } {
   const end = new Date();
@@ -168,6 +177,10 @@ function HeadcountTab() {
 
   if (error) return <Alert severity="error">{error}</Alert>;
 
+  if (filteredTrend.length === 0 && fillRates.length === 0) {
+    return <EmptyState />;
+  }
+
   return (
     <Box>
       <Box sx={{ mb: 3 }}>
@@ -210,7 +223,6 @@ function AttendanceTab() {
   const theme = useTheme();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [earlyLeaveData, setEarlyLeaveData] = useState<Record<string, number>>({});
   const [onPremiseData, setOnPremiseData] = useState<
     Array<{ date: string; requested: number; required: number; working: number }>
   >([]);
@@ -223,18 +235,13 @@ function AttendanceTab() {
         setLoading(true);
         setError(null);
         const { start, end } = getDefaultDateRange(30);
-
-        const [opData, _elStats] = await Promise.all([
-          getOnPremiseData(start, end),
-          getEarlyLeaveStats(start, end),
-        ]);
+        const opData = await getOnPremiseData(start, end);
 
         if (!cancelled) {
           const sorted = [...opData].sort(
             (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
           );
           setOnPremiseData(sorted);
-          setEarlyLeaveData({});
         }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load data');
@@ -275,24 +282,6 @@ function AttendanceTab() {
     };
   }, [onPremiseData, theme]);
 
-  const earlyLeaveChartData = useMemo(() => {
-    const labels = Object.keys(earlyLeaveData);
-    const values = Object.values(earlyLeaveData);
-
-    return {
-      labels,
-      datasets: [
-        {
-          label: 'Early Leaves by Shift',
-          data: values,
-          backgroundColor: [theme.palette.primary.main, theme.palette.secondary.main],
-          borderWidth: 0,
-          borderRadius: 6,
-        },
-      ],
-    };
-  }, [earlyLeaveData, theme]);
-
   const lineOptions: ChartOptions<'line'> = useMemo(
     () => ({
       responsive: true,
@@ -319,33 +308,17 @@ function AttendanceTab() {
 
   if (error) return <Alert severity="error">{error}</Alert>;
 
+  if (onPremiseData.length === 0) return <EmptyState />;
+
   return (
-    <Grid container spacing={3}>
-      <Grid size={{ xs: 12, md: 8 }}>
-        <Typography variant="h6" gutterBottom>
-          Attendance % Trend (Last 30 Days)
-        </Typography>
-        <Box sx={{ position: 'relative', height: 350 }}>
-          <Line data={attendanceChartData} options={lineOptions} />
-        </Box>
-      </Grid>
-      <Grid size={{ xs: 12, md: 4 }}>
-        <Typography variant="h6" gutterBottom>
-          Early Leave Frequency by Shift
-        </Typography>
-        <Box sx={{ position: 'relative', height: 350 }}>
-          <Bar
-            data={earlyLeaveChartData}
-            options={{
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: { legend: { display: false } },
-              scales: { y: { beginAtZero: true }, x: { grid: { display: false } } },
-            }}
-          />
-        </Box>
-      </Grid>
-    </Grid>
+    <Box>
+      <Typography variant="h6" gutterBottom>
+        Attendance % Trend (Last 30 Days)
+      </Typography>
+      <Box sx={{ position: 'relative', height: 400 }}>
+        <Line data={attendanceChartData} options={lineOptions} />
+      </Box>
+    </Box>
   );
 }
 
@@ -443,6 +416,8 @@ function RecruiterTab() {
   }
 
   if (error) return <Alert severity="error">{error}</Alert>;
+
+  if (metrics.length === 0) return <EmptyState />;
 
   return (
     <Box>
@@ -552,6 +527,8 @@ function LaborTab() {
   }
 
   if (error) return <Alert severity="error">{error}</Alert>;
+
+  if (hoursData.length === 0) return <EmptyState />;
 
   return (
     <Grid container spacing={3}>
@@ -764,6 +741,8 @@ function YearOverYearTab() {
   }
 
   if (error) return <Alert severity="error">{error}</Alert>;
+
+  if (currentData.length === 0 && lastYearData.length === 0) return <EmptyState />;
 
   return (
     <Box>

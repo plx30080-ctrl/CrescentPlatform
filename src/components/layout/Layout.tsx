@@ -25,6 +25,7 @@ import UploadIcon from '@mui/icons-material/Upload';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import EventBusyIcon from '@mui/icons-material/EventBusy';
 import LogoutIcon from '@mui/icons-material/Logout';
+import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
 import { useAuth } from '../../contexts/AuthContext';
 
 const DRAWER_WIDTH = 260;
@@ -33,6 +34,7 @@ interface NavItem {
   label: string;
   path: string;
   icon: React.ReactNode;
+  adminOnly?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -42,6 +44,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Data Entry', path: '/data-entry', icon: <UploadIcon /> },
   { label: 'Analytics', path: '/analytics', icon: <BarChartIcon /> },
   { label: 'Early Leaves', path: '/early-leaves', icon: <EventBusyIcon /> },
+  { label: 'User Management', path: '/users', icon: <PeopleAltIcon />, adminOnly: true },
 ];
 
 export default function Layout() {
@@ -110,7 +113,7 @@ export default function Layout() {
       </Toolbar>
       <Divider />
       <List sx={{ flex: 1, pt: 1 }}>
-        {NAV_ITEMS.map((item) => {
+        {NAV_ITEMS.filter((item) => !item.adminOnly || appUser?.role === 'admin').map((item) => {
           const isActive =
             item.path === '/'
               ? location.pathname === '/'

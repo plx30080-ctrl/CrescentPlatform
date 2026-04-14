@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Fragment } from 'react';
+import DownloadIcon from '@mui/icons-material/Download';
 import {
   Box,
   Typography,
@@ -49,6 +50,7 @@ import {
   getEarlyLeaveStats,
 } from '../services/earlyLeaveService';
 import { searchAssociates } from '../services/associateService';
+import { exportToCSV } from '../utils/csv';
 import { useNotification } from '../contexts/NotificationContext';
 import { formatDate } from '../utils/formatters';
 import type { EarlyLeaveWithAssociate, EarlyLeaveStats, CorrectiveAction } from '../types/earlyLeave';
@@ -113,6 +115,38 @@ export default function EarlyLeavesPage() {
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [rowActions, setRowActions] = useState<Record<string, CorrectiveAction[]>>({});
   const [loadingActions, setLoadingActions] = useState<string | null>(null);
+
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    try {
+      setExporting(true);
+      const result = await getEarlyLeaves({
+        shift: shiftFilter || undefined,
+        start_date: startDate || undefined,
+        end_date: endDate || undefined,
+        search: search.trim() || undefined,
+        page: 1,
+        pageSize: 10000,
+      });
+      const rows = result.data.map((l) => ({
+        Date: l.date,
+        'Associate EID': l.associate_eid,
+        Name: l.associate ? `${l.associate.first_name} ${l.associate.last_name}` : '',
+        Shift: l.shift ?? '',
+        'Leave Time': l.leave_time ?? '',
+        'Hours Worked': l.hours_worked ?? '',
+        Reason: l.reason ?? '',
+        'Corrective Action': l.corrective_action,
+        Notes: l.notes ?? '',
+      }));
+      exportToCSV(rows, `early_leaves_${new Date().toISOString().split('T')[0]}`);
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Export failed');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const loadLeaves = useCallback(async () => {
     try {
@@ -197,13 +231,23 @@ export default function EarlyLeavesPage() {
         <Typography variant="h4" sx={{ fontWeight: 700 }}>
           Early Leaves
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => setCreateDialogOpen(true)}
-        >
-          Record Early Leave
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={<DownloadIcon />}
+            onClick={handleExport}
+            disabled={exporting}
+          >
+            {exporting ? 'Exporting...' : 'Export CSV'}
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setCreateDialogOpen(true)}
+          >
+            Record Early Leave
+          </Button>
+        </Box>
       </Box>
 
       {/* Stats cards */}
@@ -360,9 +404,8 @@ export default function EarlyLeavesPage() {
                 </TableHead>
                 <TableBody>
                   {leaves.map((leave) => (
-                    <>
+                    <Fragment key={leave.id}>
                       <TableRow
-                        key={leave.id}
                         hover
                         sx={{ cursor: 'pointer' }}
                         onClick={() => handleRowExpand(leave.associate_eid, leave.id)}
@@ -444,7 +487,7 @@ export default function EarlyLeavesPage() {
                           </Collapse>
                         </TableCell>
                       </TableRow>
-                    </>
+                    </Fragment>
                   ))}
                 </TableBody>
               </Table>
