@@ -38,6 +38,7 @@ import { useNotification } from '../../contexts/NotificationContext';
 import { formatDate, formatPhone } from '../../utils/formatters';
 import { STATUS_COLORS } from '../../lib/constants';
 import AssociateForm from './AssociateForm';
+import CorrectiveActionDialog from './CorrectiveActionDialog';
 import type { Associate, AssociateFormData } from '../../types/associate';
 import type { Badge } from '../../types/badge';
 import type { EarlyLeave, CorrectiveAction } from '../../types/earlyLeave';
@@ -63,6 +64,7 @@ export default function AssociateProfile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [caDialogOpen, setCaDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
   const [creatingBadge, setCreatingBadge] = useState(false);
 
@@ -371,6 +373,11 @@ export default function AssociateProfile() {
 
           {activeTab === 1 && (
             <>
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+                <Button variant="outlined" size="small" onClick={() => setCaDialogOpen(true)}>
+                  Log Action
+                </Button>
+              </Box>
               {(!corrective_actions || corrective_actions.length === 0) ? (
                 <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
                   No corrective action records
@@ -477,6 +484,19 @@ export default function AssociateProfile() {
           />
         </DialogContent>
       </Dialog>
+
+      {/* Corrective Action Dialog */}
+      <CorrectiveActionDialog
+        open={caDialogOpen}
+        associateEid={associate.eid}
+        onClose={() => setCaDialogOpen(false)}
+        onCreated={() => {
+          setCaDialogOpen(false);
+          showSuccess('Corrective action logged');
+          loadProfile();
+        }}
+        onError={(msg) => showError(msg)}
+      />
     </Box>
   );
 }

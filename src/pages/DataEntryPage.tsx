@@ -29,7 +29,7 @@ import UploadFileIcon from '@mui/icons-material/UploadFile';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { SHIFTS, UPLOAD_TYPES } from '../lib/constants';
 import type { Shift, UploadType } from '../lib/constants';
-import { submitOnPremiseData, submitBranchMetrics } from '../services/metricsService';
+import { submitOnPremiseData, submitBranchMetrics, submitHoursData } from '../services/metricsService';
 import {
   validateMapping,
   importData,
@@ -95,6 +95,7 @@ export default function DataEntryPage() {
               >
                 <Tab label="On-Premise Data" />
                 <Tab label="Branch Metrics" />
+                <Tab label="Hours Data" />
               </Tabs>
 
               {manualSubTab === 0 && (
@@ -106,6 +107,12 @@ export default function DataEntryPage() {
               {manualSubTab === 1 && (
                 <BranchMetricsForm
                   onSuccess={() => showSuccess('Branch metrics submitted successfully')}
+                  onError={(msg) => showError(msg)}
+                />
+              )}
+              {manualSubTab === 2 && (
+                <HoursDataForm
+                  onSuccess={() => showSuccess('Hours data submitted successfully')}
                   onError={(msg) => showError(msg)}
                 />
               )}
@@ -463,6 +470,188 @@ function BranchMetricsForm({
             onChange={(e) => handleChange('notes', e.target.value)}
             multiline
             rows={2}
+          />
+        </Grid>
+
+        <Grid size={12}>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <Button
+              type="submit"
+              variant="contained"
+              startIcon={<SendIcon />}
+              disabled={submitting}
+            >
+              {submitting ? 'Submitting...' : 'Submit'}
+            </Button>
+          </Box>
+        </Grid>
+      </Grid>
+    </Box>
+  );
+}
+
+/* ======================== Hours Data Form ======================== */
+
+function HoursDataForm({
+  onSuccess,
+  onError,
+}: {
+  onSuccess: () => void;
+  onError: (msg: string) => void;
+}) {
+  const getLastFriday = () => {
+    const d = new Date();
+    const day = d.getDay(); // 0=Sun … 6=Sat
+    d.setDate(d.getDate() - ((day + 2) % 7 || 7));
+    return d.toISOString().split('T')[0];
+  };
+
+  const [form, setForm] = useState({
+    week_ending: getLastFriday(),
+    shift1_total: '',
+    shift1_direct: '',
+    shift1_indirect: '',
+    shift2_total: '',
+    shift2_direct: '',
+    shift2_indirect: '',
+    employee_count: '',
+  });
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleChange = (field: string, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setSubmitting(true);
+      await submitHoursData(
+        {
+          week_ending: form.week_ending,
+          shift1_total: parseFloat(form.shift1_total) || 0,
+          shift1_direct: parseFloat(form.shift1_direct) || 0,
+          shift1_indirect: parseFloat(form.shift1_indirect) || 0,
+          shift2_total: parseFloat(form.shift2_total) || 0,
+          shift2_direct: parseFloat(form.shift2_direct) || 0,
+          shift2_indirect: parseFloat(form.shift2_indirect) || 0,
+          employee_count: parseInt(form.employee_count) || 0,
+          submitted_by: null,
+        },
+        [],
+      );
+      onSuccess();
+      setForm((prev) => ({
+        ...prev,
+        shift1_total: '',
+        shift1_direct: '',
+        shift1_indirect: '',
+        shift2_total: '',
+        shift2_direct: '',
+        shift2_indirect: '',
+        employee_count: '',
+      }));
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Failed to submit hours data');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Box component="form" onSubmit={handleSubmit}>
+      <Grid container spacing={2}>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <TextField
+            fullWidth
+            label="Week Ending"
+            type="date"
+            value={form.week_ending}
+            onChange={(e) => handleChange('week_ending', e.target.value)}
+            required
+            slotProps={{ inputLabel: { shrink: true } }}
+          />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <TextField
+            fullWidth
+            label="Employee Count"
+            type="number"
+            value={form.employee_count}
+            onChange={(e) => handleChange('employee_count', e.target.value)}
+            required
+          />
+        </Grid>
+
+        <Grid size={12}>
+          <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 1 }}>
+            Shift 1 Hours
+          </Typography>
+        </Grid>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <TextField
+            fullWidth
+            label="Total"
+            type="number"
+            value={form.shift1_total}
+            onChange={(e) => handleChange('shift1_total', e.target.value)}
+            slotProps={{ input: { inputProps: { step: '0.5', min: '0' } } }}
+          />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <TextField
+            fullWidth
+            label="Direct"
+            type="number"
+            value={form.shift1_direct}
+            onChange={(e) => handleChange('shift1_direct', e.target.value)}
+            slotProps={{ input: { inputProps: { step: '0.5', min: '0' } } }}
+          />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <TextField
+            fullWidth
+            label="Indirect"
+            type="number"
+            value={form.shift1_indirect}
+            onChange={(e) => handleChange('shift1_indirect', e.target.value)}
+            slotProps={{ input: { inputProps: { step: '0.5', min: '0' } } }}
+          />
+        </Grid>
+
+        <Grid size={12}>
+          <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 1 }}>
+            Shift 2 Hours
+          </Typography>
+        </Grid>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <TextField
+            fullWidth
+            label="Total"
+            type="number"
+            value={form.shift2_total}
+            onChange={(e) => handleChange('shift2_total', e.target.value)}
+            slotProps={{ input: { inputProps: { step: '0.5', min: '0' } } }}
+          />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <TextField
+            fullWidth
+            label="Direct"
+            type="number"
+            value={form.shift2_direct}
+            onChange={(e) => handleChange('shift2_direct', e.target.value)}
+            slotProps={{ input: { inputProps: { step: '0.5', min: '0' } } }}
+          />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <TextField
+            fullWidth
+            label="Indirect"
+            type="number"
+            value={form.shift2_indirect}
+            onChange={(e) => handleChange('shift2_indirect', e.target.value)}
+            slotProps={{ input: { inputProps: { step: '0.5', min: '0' } } }}
           />
         </Grid>
 

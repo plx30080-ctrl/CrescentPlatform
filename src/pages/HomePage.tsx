@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   Box,
   Card,
@@ -14,7 +14,11 @@ import {
   TableRow,
   Paper,
   Chip,
+  TextField,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import Grid from '@mui/material/Grid';
 import PeopleIcon from '@mui/icons-material/People';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
@@ -84,48 +88,53 @@ const PIPELINE_COLORS: Record<string, string> = {
   Declined: '#d32f2f',
 };
 
+function getDefaultRange() {
+  const end = new Date();
+  const start = new Date();
+  start.setDate(end.getDate() - 30);
+  return {
+    start: start.toISOString().split('T')[0],
+    end: end.toISOString().split('T')[0],
+  };
+}
+
 export default function HomePage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [trendData, setTrendData] = useState<HeadcountTrendPoint[]>([]);
   const [recentLeaves, setRecentLeaves] = useState<EarlyLeaveWithAssociate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  const defaultRange = useMemo(() => getDefaultRange(), []);
+  const [startDate, setStartDate] = useState(defaultRange.start);
+  const [endDate, setEndDate] = useState(defaultRange.end);
+
+  const loadData = useCallback(async (start: string, end: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const [summaryData, trend, leavesResult] = await Promise.all([
+        getDashboardSummary(start, end),
+        getHeadcountTrend(undefined, start, end),
+        getEarlyLeaves({ pageSize: 10, page: 1, start_date: start, end_date: end }),
+      ]);
+
+      setSummary(summaryData);
+      setTrendData(trend);
+      setRecentLeaves(leavesResult.data);
+      setLastUpdated(new Date());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadData() {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const [summaryData, trend, leavesResult] = await Promise.all([
-          getDashboardSummary(),
-          getHeadcountTrend(30),
-          getEarlyLeaves({ pageSize: 10, page: 1 }),
-        ]);
-
-        if (!cancelled) {
-          setSummary(summaryData);
-          setTrendData(trend);
-          setRecentLeaves(leavesResult.data);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
-
-    loadData();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    loadData(startDate, endDate);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pipelineChartData = useMemo(() => {
     if (!summary?.pipeline) return null;
@@ -172,9 +181,47 @@ export default function HomePage() {
 
   return (
     <Box>
-      <Typography variant="h4" sx={{ mb: 3, fontWeight: 700 }}>
-        Dashboard
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 3 }}>
+        <Typography variant="h4" sx={{ fontWeight: 700, flex: '1 1 auto' }}>
+          Dashboard
+        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+          <TextField
+            label="From"
+            type="date"
+            size="small"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }}
+            sx={{ width: 150 }}
+          />
+          <TextField
+            label="To"
+            type="date"
+            size="small"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }}
+            sx={{ width: 150 }}
+          />
+          <Tooltip title="Apply date range">
+            <span>
+              <IconButton
+                color="primary"
+                onClick={() => loadData(startDate, endDate)}
+                disabled={loading}
+              >
+                <RefreshIcon />
+              </IconButton>
+            </span>
+          </Tooltip>
+          {lastUpdated && (
+            <Typography variant="caption" color="text.secondary">
+              Updated {lastUpdated.toLocaleTimeString()}
+            </Typography>
+          )}
+        </Box>
+      </Box>
 
       {/* Stat cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>

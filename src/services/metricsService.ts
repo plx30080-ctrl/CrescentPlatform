@@ -131,25 +131,35 @@ export async function getDashboardSummary(
   endDate?: string
 ): Promise<DashboardSummary> {
   const { data, error } = await supabase.rpc('get_dashboard_summary', {
-    p_start_date: startDate ?? undefined,
-    p_end_date: endDate ?? undefined,
+    p_start_date: startDate,
+    p_end_date: endDate,
   });
 
   if (error) throw new Error(`Failed to fetch dashboard summary: ${error.message}`);
   return data as DashboardSummary;
 }
 
-export async function getHeadcountTrend(days?: number): Promise<HeadcountTrendPoint[]> {
-  const lookback = days ?? 30;
-  const start = new Date();
-  start.setDate(start.getDate() - lookback);
-  const startStr = start.toISOString().split('T')[0];
+export async function getHeadcountTrend(
+  days?: number,
+  startDate?: string,
+  endDate?: string,
+): Promise<HeadcountTrendPoint[]> {
+  let startStr = startDate;
+  if (!startStr) {
+    const lookback = days ?? 30;
+    const start = new Date();
+    start.setDate(start.getDate() - lookback);
+    startStr = start.toISOString().split('T')[0];
+  }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('on_premise_data')
     .select('date, shift, requested, required, working')
-    .gte('date', startStr)
-    .order('date', { ascending: true });
+    .gte('date', startStr);
+
+  if (endDate) query = query.lte('date', endDate);
+
+  const { data, error } = await query.order('date', { ascending: true });
 
   if (error) throw new Error(`Failed to fetch headcount trend: ${error.message}`);
 

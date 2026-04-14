@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import DownloadIcon from '@mui/icons-material/Download';
 import {
   Box,
   Typography,
@@ -34,6 +35,7 @@ import {
   STATUS_COLORS,
 } from '../lib/constants';
 import { getAssociates, createAssociate } from '../services/associateService';
+import { exportToCSV } from '../utils/csv';
 import { formatDate } from '../utils/formatters';
 import { useNotification } from '../contexts/NotificationContext';
 import AssociateForm from '../components/associates/AssociateForm';
@@ -58,6 +60,7 @@ export default function AssociatesPage() {
   const [rowsPerPage, setRowsPerPage] = useState(25);
 
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const loadAssociates = useCallback(async () => {
     try {
@@ -88,6 +91,43 @@ export default function AssociatesPage() {
   useEffect(() => {
     loadAssociates();
   }, [loadAssociates]);
+
+  const handleExport = async () => {
+    try {
+      setExporting(true);
+      const result = await getAssociates({
+        search: search.trim() || undefined,
+        status: statusFilter || undefined,
+        pipeline_status: pipelineFilter || undefined,
+        shift: shiftFilter || undefined,
+        branch: branchFilter.trim() || undefined,
+        page: 1,
+        pageSize: 10000,
+      });
+      const rows = result.data.map((a) => ({
+        EID: a.eid,
+        'First Name': a.first_name,
+        'Last Name': a.last_name,
+        Status: a.status,
+        Pipeline: a.pipeline_status,
+        Shift: a.shift ?? '',
+        Branch: a.branch ?? '',
+        Recruiter: a.recruiter ?? '',
+        'Process Date': a.process_date ?? '',
+        'Planned Start': a.planned_start_date ?? '',
+        'Actual Start': a.actual_start_date ?? '',
+        'I-9 Cleared': a.i9_cleared ? 'Yes' : 'No',
+        'Background Check': a.background_check_status ?? '',
+        Email: a.email ?? '',
+        Phone: a.phone ?? '',
+      }));
+      exportToCSV(rows, `associates_${new Date().toISOString().split('T')[0]}`);
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Export failed');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,13 +170,23 @@ export default function AssociatesPage() {
         <Typography variant="h4" sx={{ fontWeight: 700 }}>
           Associates
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => setAddDialogOpen(true)}
-        >
-          Add Associate
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={<DownloadIcon />}
+            onClick={handleExport}
+            disabled={exporting}
+          >
+            {exporting ? 'Exporting...' : 'Export CSV'}
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setAddDialogOpen(true)}
+          >
+            Add Associate
+          </Button>
+        </Box>
       </Box>
 
       {/* Search bar */}

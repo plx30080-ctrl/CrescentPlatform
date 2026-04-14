@@ -14,6 +14,7 @@ import BadgeManagementPage from './pages/BadgeManagementPage';
 import DataEntryPage from './pages/DataEntryPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import EarlyLeavesPage from './pages/EarlyLeavesPage';
+import UserManagementPage from './pages/UserManagementPage';
 
 export default function App() {
   return (
@@ -33,6 +34,7 @@ export default function App() {
                   <Route path="data-entry" element={<DataEntryPage />} />
                   <Route path="analytics" element={<AnalyticsPage />} />
                   <Route path="early-leaves" element={<EarlyLeavesPage />} />
+                  <Route path="users" element={<UserManagementPage />} />
                 </Route>
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />

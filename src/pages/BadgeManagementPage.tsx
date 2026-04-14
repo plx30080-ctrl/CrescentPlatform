@@ -34,12 +34,14 @@ import ErrorIcon from '@mui/icons-material/Error';
 import {
   getBadges,
   createBadge,
+  updateBadge,
   getPrintQueue,
   addToPrintQueue,
   updatePrintJob,
 } from '../services/badgeService';
 import { searchAssociates } from '../services/associateService';
 import { printBadge } from '../services/printService';
+import { uploadBadgePhoto } from '../services/storageService';
 import { useNotification } from '../contexts/NotificationContext';
 import { formatDate } from '../utils/formatters';
 import { STATUS_COLORS } from '../lib/constants';
@@ -61,8 +63,14 @@ export default function BadgeManagementPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Associate[]>([]);
   const [selectedAssociate, setSelectedAssociate] = useState<Associate | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const updatePhotoInputRef = useRef<HTMLInputElement>(null);
 
   const badgePreviewRef = useRef<HTMLDivElement>(null);
 
@@ -121,21 +129,53 @@ export default function BadgeManagementPage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  const handlePhotoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
+    setPhotoFile(file);
+  };
+
   const handleCreateBadge = async () => {
     if (!selectedAssociate) return;
 
     try {
       setCreating(true);
-      await createBadge(selectedAssociate.eid, null, true);
+      let photoUrl: string | null = null;
+      if (photoFile) {
+        photoUrl = await uploadBadgePhoto(photoFile, selectedAssociate.eid);
+      }
+      await createBadge(selectedAssociate.eid, photoUrl, true);
       showSuccess(`Badge created for ${selectedAssociate.first_name} ${selectedAssociate.last_name}`);
       setCreateDialogOpen(false);
       setSelectedAssociate(null);
       setSearchQuery('');
+      setPhotoFile(null);
+      setPhotoPreview((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
       loadBadges();
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Failed to create badge');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleUpdatePhoto = async (file: File) => {
+    if (!selectedBadge) return;
+    try {
+      setUploadingPhoto(true);
+      const photoUrl = await uploadBadgePhoto(file, selectedBadge.associate_eid);
+      await updateBadge(selectedBadge.id, { photo_url: photoUrl });
+      showSuccess('Photo updated');
+      setSelectedBadge((prev) => prev ? { ...prev, photo_url: photoUrl } : prev);
+      loadBadges();
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Failed to upload photo');
+    } finally {
+      setUploadingPhoto(false);
     }
   };
 
@@ -303,7 +343,7 @@ export default function BadgeManagementPage() {
                         badgeNumber={selectedBadge.id.slice(0, 8)}
                       />
                     </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap' }}>
                       <Button
                         variant="outlined"
                         startIcon={<PrintIcon />}
@@ -320,6 +360,25 @@ export default function BadgeManagementPage() {
                       >
                         Queue
                       </Button>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        disabled={uploadingPhoto}
+                        onClick={() => updatePhotoInputRef.current?.click()}
+                      >
+                        {uploadingPhoto ? 'Uploading...' : 'Update Photo'}
+                      </Button>
+                      <input
+                        ref={updatePhotoInputRef}
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleUpdatePhoto(file);
+                          e.target.value = '';
+                        }}
+                      />
                     </Box>
                   </Paper>
                 </Grid>
@@ -412,6 +471,13 @@ export default function BadgeManagementPage() {
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             Search for an associate to create a badge for:
           </Typography>
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={handlePhotoFileChange}
+          />
           <Autocomplete
             options={searchResults}
             getOptionLabel={(option) =>
@@ -458,15 +524,35 @@ export default function BadgeManagementPage() {
             }}
           />
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCreateDialogOpen(false)}>Cancel</Button>
+        <DialogActions sx={{ justifyContent: 'space-between', px: 3 }}>
           <Button
-            variant="contained"
-            onClick={handleCreateBadge}
-            disabled={!selectedAssociate || creating}
+            size="small"
+            variant="outlined"
+            onClick={() => photoInputRef.current?.click()}
+            sx={{ color: 'text.secondary' }}
           >
-            {creating ? 'Creating...' : 'Create Badge'}
+            {photoPreview ? 'Change Photo' : 'Add Photo (optional)'}
           </Button>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            {photoPreview && (
+              <Box
+                component="img"
+                src={photoPreview}
+                alt="preview"
+                sx={{ width: 36, height: 36, borderRadius: 1, objectFit: 'cover' }}
+              />
+            )}
+            <Button onClick={() => { setCreateDialogOpen(false); setPhotoFile(null); setPhotoPreview((prev) => { if (prev) URL.revokeObjectURL(prev); return null; }); }}>
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              onClick={handleCreateBadge}
+              disabled={!selectedAssociate || creating}
+            >
+              {creating ? 'Creating...' : 'Create Badge'}
+            </Button>
+          </Box>
         </DialogActions>
       </Dialog>
     </Box>
