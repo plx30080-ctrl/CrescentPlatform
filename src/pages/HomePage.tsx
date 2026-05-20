@@ -103,37 +103,60 @@ export default function HomePage() {
   const [trendData, setTrendData] = useState<HeadcountTrendPoint[]>([]);
   const [recentLeaves, setRecentLeaves] = useState<EarlyLeaveWithAssociate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [leavesLoading, setLeavesLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [leavesError, setLeavesError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const defaultRange = useMemo(() => getDefaultRange(), []);
   const [startDate, setStartDate] = useState(defaultRange.start);
   const [endDate, setEndDate] = useState(defaultRange.end);
 
-  const loadData = useCallback(async (start: string, end: string) => {
+  const loadDashboardContent = useCallback(async (start: string, end: string) => {
     try {
       setLoading(true);
       setError(null);
 
-      const [summaryData, trend, leavesResult] = await Promise.all([
+      const [summaryData, trend] = await Promise.all([
         getDashboardSummary(start, end),
         getHeadcountTrend(undefined, start, end),
-        getEarlyLeaves({ pageSize: 10, page: 1, start_date: start, end_date: end }),
       ]);
 
       setSummary(summaryData);
       setTrendData(trend);
-      setRecentLeaves(leavesResult.data);
       setLastUpdated(new Date());
     } catch (err) {
+      console.error('Failed to load dashboard data:', err);
       setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
   }, []);
 
+  const loadRecentLeaves = useCallback(async (start: string, end: string) => {
+    try {
+      setLeavesLoading(true);
+      setLeavesError(null);
+
+      const leavesResult = await getEarlyLeaves({
+        pageSize: 10,
+        page: 1,
+        start_date: start,
+        end_date: end,
+      });
+
+      setRecentLeaves(leavesResult.data);
+    } catch (err) {
+      console.error('Failed to load recent early leaves:', err);
+      setLeavesError(err instanceof Error ? err.message : 'Failed to load recent early leaves');
+    } finally {
+      setLeavesLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    loadData(startDate, endDate);
+    loadDashboardContent(startDate, endDate);
+    loadRecentLeaves(startDate, endDate);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pipelineChartData = useMemo(() => {
@@ -208,7 +231,10 @@ export default function HomePage() {
             <span>
               <IconButton
                 color="primary"
-                onClick={() => loadData(startDate, endDate)}
+                onClick={() => {
+                  loadDashboardContent(startDate, endDate);
+                  loadRecentLeaves(startDate, endDate);
+                }}
                 disabled={loading}
               >
                 <RefreshIcon />
@@ -322,7 +348,13 @@ export default function HomePage() {
           <Typography variant="h6" gutterBottom>
             Recent Early Leaves
           </Typography>
-          {recentLeaves.length === 0 ? (
+          {leavesLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : leavesError ? (
+            <Alert severity="error">{leavesError}</Alert>
+          ) : recentLeaves.length === 0 ? (
             <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
               No recent early leaves
             </Typography>
