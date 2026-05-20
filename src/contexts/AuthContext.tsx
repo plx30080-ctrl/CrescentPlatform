@@ -57,13 +57,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let mounted = true;
 
     async function initializeAuth() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
 
-      if (mounted) {
+        if (!mounted) return;
+
         const currentUser = session?.user ?? null;
         setUser(currentUser);
+        setLoading(false);
 
         if (currentUser) {
           const profile = await fetchAppUser(currentUser.id);
@@ -71,8 +74,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setAppUser(profile);
           }
         }
-
-        setLoading(false);
+      } catch (error) {
+        console.error('Failed to initialize auth:', error);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     }
 
@@ -85,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const currentUser = session?.user ?? null;
       setUser(currentUser);
+      setLoading(false);
 
       if (currentUser && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
         const profile = await fetchAppUser(currentUser.id);
@@ -94,8 +101,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else if (!currentUser) {
         setAppUser(null);
       }
-
-      setLoading(false);
     });
 
     return () => {
