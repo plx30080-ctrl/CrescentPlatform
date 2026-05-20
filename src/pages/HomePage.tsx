@@ -103,8 +103,10 @@ export default function HomePage() {
   const [trendData, setTrendData] = useState<HeadcountTrendPoint[]>([]);
   const [recentLeaves, setRecentLeaves] = useState<EarlyLeaveWithAssociate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [trendLoading, setTrendLoading] = useState(true);
   const [leavesLoading, setLeavesLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [trendError, setTrendError] = useState<string | null>(null);
   const [leavesError, setLeavesError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
@@ -112,24 +114,34 @@ export default function HomePage() {
   const [startDate, setStartDate] = useState(defaultRange.start);
   const [endDate, setEndDate] = useState(defaultRange.end);
 
-  const loadDashboardContent = useCallback(async (start: string, end: string) => {
+  const loadDashboardSummary = useCallback(async (start: string, end: string) => {
     try {
       setLoading(true);
       setError(null);
 
-      const [summaryData, trend] = await Promise.all([
-        getDashboardSummary(start, end),
-        getHeadcountTrend(undefined, start, end),
-      ]);
-
+      const summaryData = await getDashboardSummary(start, end);
       setSummary(summaryData);
-      setTrendData(trend);
       setLastUpdated(new Date());
     } catch (err) {
-      console.error('Failed to load dashboard data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
+      console.error('Failed to load dashboard summary:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load dashboard summary');
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const loadTrendData = useCallback(async (start: string, end: string) => {
+    try {
+      setTrendLoading(true);
+      setTrendError(null);
+
+      const trend = await getHeadcountTrend(undefined, start, end);
+      setTrendData(trend);
+    } catch (err) {
+      console.error('Failed to load headcount trend:', err);
+      setTrendError(err instanceof Error ? err.message : 'Failed to load headcount trend');
+    } finally {
+      setTrendLoading(false);
     }
   }, []);
 
@@ -155,7 +167,8 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    loadDashboardContent(startDate, endDate);
+    loadDashboardSummary(startDate, endDate);
+    loadTrendData(startDate, endDate);
     loadRecentLeaves(startDate, endDate);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -232,7 +245,8 @@ export default function HomePage() {
               <IconButton
                 color="primary"
                 onClick={() => {
-                  loadDashboardContent(startDate, endDate);
+                  loadDashboardSummary(startDate, endDate);
+                  loadTrendData(startDate, endDate);
                   loadRecentLeaves(startDate, endDate);
                 }}
                 disabled={loading}
@@ -290,7 +304,15 @@ export default function HomePage() {
         <Grid size={{ xs: 12, md: 8 }}>
           <Card>
             <CardContent>
-              <HeadcountChart data={trendData} title="Headcount Trend (Last 30 Days)" />
+              {trendLoading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 350 }}>
+                  <CircularProgress />
+                </Box>
+              ) : trendError ? (
+                <Alert severity="error">{trendError}</Alert>
+              ) : (
+                <HeadcountChart data={trendData} title="Headcount Trend (Last 30 Days)" />
+              )}
             </CardContent>
           </Card>
         </Grid>
